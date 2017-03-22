@@ -2,6 +2,9 @@
  * Install blueprint for ember-frost-test addon
  */
 
+var npm = require('ember-frost-test/lib/utils/npm')
+var consumer = require('ember-frost-test/lib/utils/consumer')
+var packageHandler = require('ember-frost-test/lib/utils/package-handler')
 var Promise = require('bluebird')
 var chalk = require('chalk')
 var cpExec = require('child_process').exec
@@ -49,41 +52,46 @@ module.exports = {
    * package.json, so this is a temporary fix for that.
    */
   addPackagesToProject: function (packagesToAdd) {
-    const packageNameStr = packagesToAdd.map(pkg => pkg.name).join(' ')
-    this.ui.writeLine(chalk.green('Installing packages') + ` ${packageNameStr}`)
-    const pkgInstallStr = packagesToAdd.map(pkg => `${pkg.name}@${pkg.target}`).join(' ')
-    return exec(`npm install --save-dev ${pkgInstallStr}`)
+    return npm.install(packagesToAdd)
   },
 
-  afterInstall: function () {
+  afterInstall: function (options) {
     const bowerPackagesToRemove = [
       {name: 'sinon-chai'},
       {name: 'chai-jquery'}
     ]
 
-    const addonsToAdd = {
-      packages: [
-        {name: 'ember-cli-mocha', target: '^0.13.0'},
-        {name: 'ember-hook', target: '^1.3.5'},
-        {name: 'ember-sinon', target: '^0.6.0'},
-        {name: 'ember-test-utils', target: '^1.3.2'}
-      ]
-    }
+    const addonsToAdd = [
+      {name: 'ember-cli-mocha', target: '^0.13.0'},
+      {name: 'ember-hook', target: '^1.3.5'},
+      {name: 'ember-sinon', target: '^0.6.0'},
+      {name: 'ember-test-utils', target: '^1.3.2'}
+    ]
 
     const packagesToAdd = [
       {name: 'sinon-chai', target: '^2.8.0'},
       {name: 'chai-jquery', target: '^2.0.0'}
     ]
 
+    const consumerPackages = consumer.getPackages(options)
+
     return this.removeBowerPackagesFromProject(bowerPackagesToRemove)
       .then(() => {
         return this.removeLoadingOfTestHelpers()
       })
       .then(() => {
-        return this.addAddonsToProject(addonsToAdd)
+        return packageHandler.getPkgsToInstall(addonsToAdd, consumerPackages).then((pkgsToInstall) => {
+          if (pkgsToInstall.length !== 0) {
+            return this.addAddonsToProject({packages: pkgsToInstall})
+          }
+        })
       })
       .then(() => {
-        return this.addPackagesToProject(packagesToAdd)
+        return packageHandler.getPkgsToInstall(packagesToAdd, consumerPackages).then((pkgsToInstall) => {
+          if (pkgsToInstall.length !== 0) {
+            return this.addPackagesToProject(pkgsToInstall)
+          }
+        })
       })
   },
 
